@@ -1,0 +1,2 @@
+{% for i in play_hosts %}
+{{ hostvars[i].ansible_hostname }} root={{ hostvars[i].password_generated.stdout }}  {{ time }} {% endfor %}
