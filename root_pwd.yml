@@ -1,0 +1,56 @@
+---
+- name: generate and change root password on many hosts and create output to copy in pwdfile
+  gather_facts: yes
+  become: yes
+  hosts: all
+  vars:
+   time: "{{ lookup('pipe', 'date \"+%d-%b-%Y\"' ) }}"
+
+  tasks:
+   - name: generate pwd
+     shell:  cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 10;echo
+     register: password_generated
+     delegate_to: localhost
+
+#   - name: display passwd
+#     debug: msg="{{ hostvars[inventory_hostname].password_generated.stdout }}"
+
+   - name: encrypt password generated in sha512
+     shell: python -c "from passlib.hash import sha512_crypt; import getpass; print(sha512_crypt.using(rounds=5000).hash('{{ password_generated.stdout }}'))"
+     register: password_generated_encrypted
+     delegate_to: localhost
+#this requires to install : pip install passlib
+
+#   - name: display encrypted passwd
+#     debug: msg="{{ hostvars[inventory_hostname].password_generated_encrypted.stdout }}"
+
+
+   - name: change root passwd
+     user: name=root update_password=always password="{{ hostvars[inventory_hostname].password_generated_encrypted.stdout }}"
+
+   - name: report all passwd in file
+     template:
+       src: /root/rootpwd_list.j2
+       dest: /root/rootpwd_list
+     delegate_to: localhost
+     run_once: true
+
+
+
+
+
+   - name: show output file /root/rootpwd_list
+     debug: msg="{{lookup('file', '/root/rootpwd_list').split('\n') }}"
+     delegate_to: localhost
+     run_once: true
+
+
+
+
+
+
+
+#strings /dev/urandom | grep -o '[[:alnum:]]' | head -n 10 | tr -d '\n';echo
+#date "+%d-%b-%Y"
+#cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 10;echo
+#python -c "from passlib.hash import sha512_crypt; import getpass; print(sha512_crypt.using(rounds=5000).hash('totototo'))"
